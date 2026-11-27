@@ -165,6 +165,15 @@ class Api(unittest.TestCase):
         self.assertTrue(body.startswith(b"\x89PNG"))
         self.assertEqual(self.req(f"/api/doc/{doc['id']}/page/99.png")[0], 404)
 
+    def test_sample_endpoint_and_doc_cap(self):
+        code, body = self.req("/api/sample")
+        self.assertEqual(code, 200)
+        info = json.loads(body)
+        self.assertEqual(info["pages"], 3)
+        for _ in range(server.MAX_DOCS + 3):
+            self.req("/api/sample")
+        self.assertLessEqual(len(server.DOCS), server.MAX_DOCS)
+
     def test_rejects_bad_input(self):
         self.assertEqual(self.req("/api/upload", b"hello")[0], 400)
         self.assertEqual(self.req("/api/ask", b"{}")[0], 400)
