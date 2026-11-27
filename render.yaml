@@ -1,0 +1,23 @@
+# Render Blueprint for a free public demo. The model key is NOT in this file: add PAGECITE_LLM_KEY in the Render dashboard.
+services:
+  - type: web
+    name: pagecite
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python samples/make_sample.py samples/expense_policy.pdf
+    startCommand: python -m pagecite.server
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: PAGECITE_HOST
+        value: 0.0.0.0
+      - key: PAGECITE_DEMO
+        value: "1"
+      - key: PAGECITE_LLM_URL
+        value: https://api.groq.com/openai/v1/chat/completions
+      - key: PAGECITE_LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: PAGECITE_TRUSTED_HOPS
+        value: "2"          # calibrate after deploy; see README
+      - key: PAGECITE_LLM_KEY
+        sync: false          # secret, set in the dashboard
