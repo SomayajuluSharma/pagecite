@@ -10,15 +10,24 @@ function show(p, q) {
   $("pageinfo").textContent = `Page ${page} / ${doc.pages}`;
 }
 function add(cls, node) { const d = document.createElement("div"); d.className = "msg " + cls; d.append(node); $("log").append(d); $("log").scrollTop = 1e9; return d; }
+function loaded(j) {
+  doc = j; $("docname").textContent = j.name; $("q").disabled = $("send").disabled = false;
+  let note = `Loaded "${j.name}" (${j.pages} pages).`;
+  if (j.empty_pages.length) note += ` No text on page(s) ${j.empty_pages.join(", ")} (scanned images are not supported yet).`;
+  if (!j.agent_available) { $("mode").value = "extractive"; $("mode").disabled = true; note += " AI agent mode is off on this server (no model key); using extractive answers."; }
+  add("bot", document.createTextNode(note)); show(1, []);
+}
 $("file").onchange = async e => {
   const f = e.target.files[0]; if (!f) return;
   const r = await fetch("/api/upload", {method: "POST", headers: {"X-Filename": f.name}, body: f});
   const j = await r.json();
   if (!r.ok) return add("bot nf", document.createTextNode("Upload failed: " + j.error));
-  doc = j; $("docname").textContent = j.name; $("q").disabled = $("send").disabled = false;
-  let note = `Loaded "${j.name}" (${j.pages} pages).`;
-  if (j.empty_pages.length) note += ` No text on page(s) ${j.empty_pages.join(", ")} (scanned images are not supported yet).`;
-  add("bot", document.createTextNode(note)); show(1, []);
+  loaded(j);
+};
+$("sample").onclick = async () => {
+  const r = await fetch("/api/sample"); const j = await r.json();
+  if (!r.ok) return add("bot nf", document.createTextNode(j.error));
+  loaded(j);
 };
 $("prev").onclick = () => show(page - 1, []); $("next").onclick = () => show(page + 1, []);
 $("form").onsubmit = async e => {
