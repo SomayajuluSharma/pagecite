@@ -11,11 +11,17 @@ from urllib.parse import parse_qs, urlparse
 
 from .index import DocIndex
 from .agent import llm_configured
-from .qa import answer
+from .qa import answer, answer_extractive
+from .guard import BUDGET, PER_DOC, PER_IP, client_ip
 from .render import render_page
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
-MAX_UPLOAD = 25 * 1024 * 1024
+import os
+DEMO = os.environ.get("PAGECITE_DEMO") == "1"
+MAX_UPLOAD = (5 if DEMO else 25) * 1024 * 1024
+MAX_DOCS = 20
+MAX_QUESTION = 500
+SAMPLE = Path(__file__).resolve().parent.parent / "samples" / "expense_policy.pdf"
 DOCS = {}
 LOCK = threading.Lock()
 
@@ -32,8 +38,35 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    def _store(self, did, idx):
+        with LOCK:
+            DOCS[did] = idx
+            while len(DOCS) > MAX_DOCS:          # bound memory on a shared demo
+                DOCS.pop(next(iter(DOCS)))
+
+    def _ai_denied(self, doc_id):
+        """Reason the AI answer must be skipped (falls back to extractive), or ''."""
+        ip = client_ip(self.headers.get("X-Forwarded-For"), self.client_address[0])
+        if not PER_DOC.check(doc_id):
+            return "this document reached its hourly AI limit"
+        if not PER_IP.check(ip):
+            return "you reached the hourly AI limit for this demo"
+        ok, why = BUDGET.allow()
+        return "" if ok else why
+
+    def _doc_info(self, did, idx):
+        return {"id": did, "name": idx.name, "pages": idx.page_count, "chunks": len(idx.chunks),
+                "agent_available": llm_configured(), "empty_pages": idx.empty_pages, "demo": DEMO}
+
     def do_GET(self):
         u = urlparse(self.path)
+        if u.path == "/api/sample":
+            if not SAMPLE.exists():
+                return self._json({"error": "no sample PDF on this server"}, 404)
+            idx = DocIndex(SAMPLE.read_bytes(), "expense_policy_sample.pdf")
+            did = uuid.uuid4().hex[:12]
+            self._store(did, idx)
+            return self._json(self._doc_info(did, idx))
         m = re.fullmatch(r"/api/doc/([a-f0-9]+)/page/(\d+)\.png", u.path)
         if m:
             doc = DOCS.get(m.group(1))
@@ -62,9 +95,14 @@ class Handler(BaseHTTPRequestHandler):
         self._json({"error": "not found"}, 404)
 
     def do_POST(self):
-        n = int(self.headers.get("Content-Length", 0))
+        try:
+            n = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            return self._json({"error": "bad Content-Length"}, 400)
+        if n < 0:
+            return self._json({"error": "bad Content-Length"}, 400)
         if n > MAX_UPLOAD:
-            return self._json({"error": "file too large (25 MB max)"}, 413)
+            return self._json({"error": "file too large ({} MB max)".format(MAX_UPLOAD // 2**20) + ""}, 413)
         body = self.rfile.read(n)
         if self.path == "/api/upload":
             if not body.startswith(b"%PDF"):
@@ -74,9 +112,8 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 return self._json({"error": "could not read this PDF"}, 400)
             did = uuid.uuid4().hex[:12]
-            DOCS[did] = idx
-            return self._json({"id": did, "name": idx.name, "pages": idx.page_count,
-                               "chunks": len(idx.chunks), "agent_available": llm_configured(), "empty_pages": idx.empty_pages})
+            self._store(did, idx)
+            return self._json(self._doc_info(did, idx))
         if self.path == "/api/ask":
             try:
                 req = json.loads(body)
@@ -86,13 +123,23 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": "need doc and question"}, 400)
             if not q:
                 return self._json({"error": "empty question"}, 400)
-            return self._json(answer(doc, q, req.get("mode", "auto")))
+            q = q[:MAX_QUESTION]
+            mode = req.get("mode", "auto")
+            if mode != "extractive" and llm_configured():
+                why = self._ai_denied(req["doc"])
+                if why:
+                    r = answer_extractive(doc, q)
+                    r["fallback_reason"] = why
+                    return self._json(r)
+            return self._json(answer(doc, q, mode))
         self._json({"error": "not found"}, 404)
 
 
 def main(port=8765):
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"PageCite running at http://127.0.0.1:{port}")
+    port = int(os.environ.get("PORT", port))        # hosts such as Render pass the port in $PORT
+    host = os.environ.get("PAGECITE_HOST", "127.0.0.1")
+    srv = ThreadingHTTPServer((host, port), Handler)
+    print(f"PageCite listening on {host}:{port}")
     srv.serve_forever()
 
 
