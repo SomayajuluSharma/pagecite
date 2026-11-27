@@ -51,3 +51,13 @@ Small sample, questions written by the author, page correctness checked by me ag
 - Retrieval is keyword-based (BM25), so it can miss paraphrases; the agent can compensate by rephrasing searches or reading pages, but there are no embeddings. Facts in tables are cited by page only.
 - Documents are held in memory for the life of the server; one process, no auth. Meant for local use.
 - Tested on a small fictional PDF, not a benchmark.
+
+## Browser demo (docs/)
+
+`docs/` is a static, browser-only port (JavaScript + PDF.js) that can be served from GitHub Pages. The PDF never leaves the tab.
+
+- Default mode is **extractive (no AI)**: BM25 keyword search that returns the best sentences with page citations.
+- Optional **AI agent mode**: paste your own Groq API key. It is kept in tab memory only (no localStorage, cookies or telemetry). In this mode your question and the PDF passages the agent reads are sent to api.groq.com. No key is ever embedded in the site.
+- Answers cite pages; clicking a citation jumps to the page and highlights the quoted text.
+- PDF text is rendered with `textContent` only and the page has a Content-Security-Policy. Tested with a PDF containing HTML/script text and an instruction-style sentence: nothing executed, and the text is treated as plain document content.
+- The browser port was checked by hand in headless Chrome on the sample PDF and the Attention paper (extractive and AI mode). It has no automated tests; the 18 Python tests cover the Python app only.
