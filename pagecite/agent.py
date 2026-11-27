@@ -62,11 +62,15 @@ def http_chat(messages):
             "tools": TOOLS, "tool_choice": "auto"}
     req = urllib.request.Request(os.environ["PAGECITE_LLM_URL"], json.dumps(body).encode(),
                                  {"Content-Type": "application/json", "User-Agent": "pagecite/0.1", "Authorization": f"Bearer {_key()}"})
+    from .guard import BUDGET
     for attempt in range(3):   # honour rate limits (free tiers) with a short bounded backoff
         try:
             with urllib.request.urlopen(req, timeout=45) as r:
+                BUDGET.record_call(r.headers)
                 return json.load(r)["choices"][0]["message"]
         except urllib.error.HTTPError as e:
+            if e.code == 429:
+                BUDGET.record_429(float(e.headers.get("Retry-After", 60) or 60))
             if e.code != 429 or attempt == 2:
                 raise
             time.sleep(min(float(e.headers.get("Retry-After", 3)), 15))
