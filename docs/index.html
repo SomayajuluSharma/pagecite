@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://api.groq.com https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; style-src 'self'">
+<title>PageCite (browser demo)</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><h1>PageCite</h1><span class="tag">Ask a PDF. Every answer cites its pages. Runs in your browser.</span>
+<button id="sample" type="button">Try sample PDF</button>
+<label class="btn" for="file">Upload PDF</label><input id="file" type="file" accept="application/pdf" hidden></header>
+<div id="notice">Your PDF stays in this tab. <b>Extractive mode</b> (default) is keyword search, <b>not AI</b>. For
+<b>AI agent mode</b>, paste your own Groq API key below: the key stays in this tab's memory only, and the question plus the PDF passages the agent reads are sent to api.groq.com.
+<input id="key" type="password" placeholder="Groq API key (optional)" autocomplete="off"> <span id="keystate"></span></div>
+<main>
+  <section id="viewer"><div id="viewbar" hidden><button id="prev">&lt;</button><span id="pageinfo"></span><button id="next">&gt;</button><span id="docname"></span></div>
+    <div id="empty">Upload a PDF or try the sample.</div>
+    <div id="pagewrap" hidden><canvas id="canvas"></canvas><div id="hl"></div></div></section>
+  <section id="chat"><div id="log"></div>
+    <form id="form"><input id="q" placeholder="Ask about the document..." autocomplete="off" disabled><button disabled id="send">Ask</button></form></section>
+</main>
+<script type="module" src="app.js"></script></body></html>
