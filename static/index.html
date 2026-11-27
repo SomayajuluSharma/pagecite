@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PageCite</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><h1>PageCite</h1><span class="tag">Ask a PDF. Every answer cites its pages.</span>
+<select id="mode" title="Answer mode"><option value="auto">Auto</option><option value="agent">AI agent</option><option value="extractive">Extractive</option></select>
+<label class="btn" for="file">Upload PDF</label><input id="file" type="file" accept="application/pdf" hidden></header>
+<main>
+  <section id="viewer"><div id="viewbar" hidden>
+      <button id="prev">&lt;</button><span id="pageinfo"></span><button id="next">&gt;</button><span id="docname"></span></div>
+    <div id="empty">Upload a PDF to begin.</div><img id="pageimg" alt="PDF page" hidden></section>
+  <section id="chat"><div id="log"></div>
+    <form id="form"><input id="q" placeholder="Ask about the document..." autocomplete="off" disabled>
+    <button disabled id="send">Ask</button></form></section>
+</main>
+<script src="/app.js"></script></body></html>
